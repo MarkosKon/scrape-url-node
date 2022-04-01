@@ -1,0 +1,64 @@
+{
+  "name": "scrape-characters-node",
+  "version": "1.0.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "scrape-characters-node": "dist/src/cli.js"
+  },
+  "engines": {
+    "node": ">=12"
+  },
+  "files": [
+    "dist/src/**/*.js"
+  ],
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc",
+    "test": "npm-run-all build test:run",
+    "test:run": "node dist/test/test.js",
+    "lint": "npm-run-all --parallel build lint:js lint:rest",
+    "lint:js": "eslint --ext=js,ts src",
+    "lint:rest": "prettier --check \"**/*.{json,yml,md}\"",
+    "format": "npm-run-all --parallel format:js format:rest",
+    "format:js": "yarn lint:js --fix",
+    "format:rest": "prettier --write \"**/*.{json,yml,md}\""
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": [
+        "lint-staged"
+      ]
+    }
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix"
+    ],
+    "*.{md,json,yml,css}": [
+      "prettier --write"
+    ]
+  },
+  "dependencies": {
+    "node-fetch": "^3.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.8",
+    "@typescript-eslint/eslint-plugin": "^5.9.0",
+    "@typescript-eslint/parser": "^5.9.0",
+    "eslint": "^8.6.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-config-airbnb-typescript": "^16.1.0",
+    "eslint-config-prettier": "^8.3.0",
+    "eslint-plugin-import": "^2.24.2",
+    "eslint-plugin-prettier": "^4.0.0",
+    "eslint-plugin-promise": "^6.0.0",
+    "eslint-plugin-unicorn": "^40.0.0",
+    "husky": "^4.*.*",
+    "lint-staged": "^12.1.5",
+    "npm-run-all": "^4.1.5",
+    "prettier": "^2.3.2",
+    "typescript": "^4.4.2"
+  }
+}
