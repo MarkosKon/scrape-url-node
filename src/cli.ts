@@ -2,6 +2,7 @@
 
 import fetch from "node-fetch";
 import type { Response } from "node-fetch";
+import cheerio from "cheerio";
 
 import { darkGray, green, red, reset, yellow } from "./colors.js";
 
@@ -17,6 +18,9 @@ const args = process.argv.slice(2);
 
 function getUniqueCharacters(input: string) {
   return Array.from(new Set(input)).sort();
+}
+function wrapInQuotes(input: string) {
+  return `'${input}'`;
 }
 
 const checkStatus = (response: Response) => {
@@ -54,6 +58,7 @@ For bugs and feature requests, please open an issue at https://github.com/your_u
     console.log(version);
     process.exit(0);
   } else {
+    // 1. GET POSITIONAL ARGUMENTS
     const positional = args.filter((_argument) => !_argument.startsWith("-"));
     if (positional.length === 0) {
       printHelp();
@@ -69,36 +74,67 @@ For bugs and feature requests, please open an issue at https://github.com/your_u
       );
     }
 
-    let url;
+    // 2. GET URL
+    let rootUrl: URL;
     try {
-      url = new URL(positional[0]);
+      rootUrl = new URL(positional[0]);
     } catch (error: unknown) {
       console.error(
-        `${red}error${reset} (${programName}): "${
+        `${red}error${reset} (${programName}): '${
           positional[0]
-        }" is not a valid URL. ${String(error)}`
+        }' is not a valid URL. ${String(error)}`
       );
       process.exit(1);
     }
 
+    // 3. FETCH HTML STRING
+    let body;
     try {
-      const response = await fetch(url.href);
-      const body = await checkStatus(response).text();
-
-      const characters = getUniqueCharacters(body);
-
-      console.log(
-        `${green}success${reset} (${programName}): You url is '${
-          url.href
-        }', and the unique characters are "${characters
-          .map((character) => `'${character}'`)
-          .join(", ")}".`
-      );
-
-      process.exitCode = 0;
+      const response = await fetch(rootUrl.href);
+      body = await checkStatus(response).text();
     } catch (error: unknown) {
       console.error(`${red}error${reset} (${programName}): ${String(error)}`);
       process.exit(1);
+    }
+
+    // 4. PARSE HTML STRING
+    const $ = cheerio.load(body);
+
+    // 5. GET LEGIT AND FAILING URLs
+    const hrefs = $("a")
+      .map((_index, element) => $(element).attr("href"))
+      .get();
+
+    const invalidHrefs: Set<string> = new Set();
+    const legitHrefs: Set<string> = new Set();
+    // eslint-disable-next-line no-restricted-syntax
+    for (const href of hrefs) {
+      try {
+        legitHrefs.add(new URL(href, rootUrl).href);
+      } catch {
+        invalidHrefs.add(href);
+      }
+    }
+
+    // 6. GET UNIQUE CHARACTERS
+    const bodyText = $("body").text();
+    const characters = getUniqueCharacters(bodyText);
+
+    // 7. PRINT RESULTS
+    const uniqueCharacterString = characters.map(wrapInQuotes).join(", ");
+    const goodUrlString = Array.from(legitHrefs).map(wrapInQuotes).join(", ");
+    const badUrlString = Array.from(invalidHrefs).map(wrapInQuotes).join(", ");
+    const badUrlOutput =
+      badUrlString.length > 0
+        ? `${yellow}your bad URLs (${invalidHrefs.size}) are => ${badUrlString}${reset}, `
+        : "";
+
+    console.log(
+      `${green}success${reset} (${programName}): Your ${green}root url is '${rootUrl.href}'${reset}, the ${green}good URLs (${legitHrefs.size}) are =>${reset} ${goodUrlString}, ${badUrlOutput}and the ${green}unique characters (${characters.length}) are =>${reset} ${uniqueCharacterString}.`
+    );
+
+    if (process.exitCode === undefined) {
+      process.exitCode = 0;
     }
   }
 
