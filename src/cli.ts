@@ -16,11 +16,12 @@ const delay = 0;
 
 const args = process.argv.slice(2);
 
-function getUniqueCharacters(input: string) {
-  return Array.from(new Set(input)).sort();
-}
 function wrapInQuotes(input: string) {
   return `'${input}'`;
+}
+
+function setToWrappedString(set: Set<string>) {
+  return Array.from(set).sort().map(wrapInQuotes).join(", ");
 }
 
 const checkStatus = (response: Response) => {
@@ -118,19 +119,19 @@ For bugs and feature requests, please open an issue at https://github.com/your_u
 
     // 6. GET UNIQUE CHARACTERS
     const bodyText = $("body").text();
-    const characters = getUniqueCharacters(bodyText);
+    const characters = new Set(bodyText);
 
     // 7. PRINT RESULTS
-    const uniqueCharacterString = characters.map(wrapInQuotes).join(", ");
-    const goodUrlString = Array.from(legitHrefs).map(wrapInQuotes).join(", ");
-    const badUrlString = Array.from(invalidHrefs).map(wrapInQuotes).join(", ");
+    const uniqueCharacterString = setToWrappedString(characters);
+    const goodUrlString = setToWrappedString(legitHrefs);
+    const badUrlString = setToWrappedString(invalidHrefs);
     const badUrlOutput =
       badUrlString.length > 0
         ? `${yellow}your bad URLs (${invalidHrefs.size}) are => ${badUrlString}${reset}, `
         : "";
 
     console.log(
-      `${green}success${reset} (${programName}): Your ${green}root url is '${rootUrl.href}'${reset}, the ${green}good URLs (${legitHrefs.size}) are =>${reset} ${goodUrlString}, ${badUrlOutput}and the ${green}unique characters (${characters.length}) are =>${reset} ${uniqueCharacterString}.`
+      `${green}success${reset} (${programName}): Your ${green}root url is '${rootUrl.href}'${reset}, the ${green}good URLs (${legitHrefs.size}) are =>${reset} ${goodUrlString}, ${badUrlOutput}and the ${green}unique characters (${characters.size}) are =>${reset} ${uniqueCharacterString}.`
     );
 
     if (process.exitCode === undefined) {
