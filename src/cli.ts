@@ -7,11 +7,9 @@ import cheerio from "cheerio";
 import { darkGray, green, red, reset, yellow } from "./colors.js";
 
 const version = "0.1.0";
-// const programName = process.argv[1];
 const programName = "scrape-characters";
 const verbose =
   process.argv.includes("-V") || process.argv.includes("--verbose");
-
 const delay = 0;
 
 const args = process.argv.slice(2);
@@ -25,7 +23,6 @@ function setToWrappedString(set: Set<string>) {
 }
 
 const checkStatus = (response: Response) => {
-  // response.ok = (response.status >= 200 && response.status < 300)
   if (response.ok) return response;
 
   throw new Error(response.statusText);
@@ -105,13 +102,15 @@ For bugs and feature requests, please open an issue at https://github.com/your_u
     const hrefs = $("a")
       .map((_index, element) => $(element).attr("href"))
       .get();
-
     const invalidHrefs: Set<string> = new Set();
     const legitHrefs: Set<string> = new Set();
     // eslint-disable-next-line no-restricted-syntax
     for (const href of hrefs) {
       try {
-        legitHrefs.add(new URL(href, rootUrl).href);
+        const candidate = new URL(href, rootUrl).href;
+        if (!candidate.startsWith("http"))
+          throw new Error("Only interested in http urls");
+        legitHrefs.add(candidate);
       } catch {
         invalidHrefs.add(href);
       }
