@@ -28,6 +28,17 @@ const checkStatus = (response: Response) => {
   throw new Error(response.statusText);
 };
 
+function isValidHref(href: string, baseUrl?: string | URL) {
+  try {
+    const candidate = new URL(href, baseUrl).href;
+    if (!candidate.startsWith("http"))
+      throw new Error("Only interested in http urls");
+    return candidate;
+  } catch {
+    return false;
+  }
+}
+
 function printHelp() {
   console.log(`Usage: ${programName} [OPTION].. <URL>
 
@@ -73,14 +84,10 @@ For bugs and feature requests, please open an issue at https://github.com/your_u
     }
 
     // 2. GET URL
-    let rootUrl: URL;
-    try {
-      rootUrl = new URL(positional[0]);
-    } catch (error: unknown) {
+    const rootHref = isValidHref(positional[0]);
+    if (rootHref === false) {
       console.error(
-        `${red}error${reset} (${programName}): '${
-          positional[0]
-        }' is not a valid URL. ${String(error)}`
+        `${red}error${reset} (${programName}): '${positional[0]}' is not a valid URL. `
       );
       process.exit(1);
     }
@@ -88,7 +95,7 @@ For bugs and feature requests, please open an issue at https://github.com/your_u
     // 3. FETCH HTML STRING
     let body;
     try {
-      const response = await fetch(rootUrl.href);
+      const response = await fetch(rootHref);
       body = await checkStatus(response).text();
     } catch (error: unknown) {
       console.error(`${red}error${reset} (${programName}): ${String(error)}`);
@@ -106,13 +113,11 @@ For bugs and feature requests, please open an issue at https://github.com/your_u
     const legitHrefs: Set<string> = new Set();
     // eslint-disable-next-line no-restricted-syntax
     for (const href of hrefs) {
-      try {
-        const candidate = new URL(href, rootUrl).href;
-        if (!candidate.startsWith("http"))
-          throw new Error("Only interested in http urls");
-        legitHrefs.add(candidate);
-      } catch {
+      const candidate = isValidHref(href, rootHref);
+      if (candidate === false) {
         invalidHrefs.add(href);
+      } else {
+        legitHrefs.add(candidate);
       }
     }
 
@@ -130,7 +135,7 @@ For bugs and feature requests, please open an issue at https://github.com/your_u
         : "";
 
     console.log(
-      `${green}success${reset} (${programName}): Your ${green}root url is '${rootUrl.href}'${reset}, the ${green}good URLs (${legitHrefs.size}) are =>${reset} ${goodUrlString}, ${badUrlOutput}and the ${green}unique characters (${characters.size}) are =>${reset} ${uniqueCharacterString}.`
+      `${green}success${reset} (${programName}): Your ${green}root url is '${rootHref}'${reset}, the ${green}good URLs (${legitHrefs.size}) are =>${reset} ${goodUrlString}, ${badUrlOutput}and the ${green}unique characters (${characters.size}) are =>${reset} ${uniqueCharacterString}.`
     );
 
     if (process.exitCode === undefined) {
