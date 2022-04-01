@@ -14,6 +14,25 @@ const delay = 0;
 
 const args = process.argv.slice(2);
 
+function printHelp() {
+  console.log(`Usage: ${programName} [OPTION].. <URL>
+
+Get unique page characters from the URL and its linked pages that are under the same domain.
+
+Options:
+  -V, --verbose              : Show additional information during execution.
+  -v, --version              : Show the version number.
+  -h, --help                 : Show this help menu.
+
+Examples:
+  1) ${programName} --pwd
+  2) ${programName} -h
+
+Made by Markos Konstantopoulos (https://markoskon.com).
+For bugs and feature requests, please open an issue at https://github.com/your_username/your_repo/issues.
+`);
+}
+
 function wrapInQuotes(input: string) {
   return `'${input}'`;
 }
@@ -37,25 +56,6 @@ function isValidHref(href: string, baseUrl?: string | URL) {
   } catch {
     return false;
   }
-}
-
-function printHelp() {
-  console.log(`Usage: ${programName} [OPTION].. <URL>
-
-Get unique page characters from the URL and its linked pages that are under the same domain.
-
-Options:
-  -V, --verbose              : Show additional information during execution.
-  -v, --version              : Show the version number.
-  -h, --help                 : Show this help menu.
-
-Examples:
-  1) ${programName} --pwd
-  2) ${programName} -h
-
-Made by Markos Konstantopoulos (https://markoskon.com).
-For bugs and feature requests, please open an issue at https://github.com/your_username/your_repo/issues.
-`);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
