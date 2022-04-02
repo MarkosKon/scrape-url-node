@@ -65,15 +65,42 @@ const checkStatus = (response: Response) => {
   throw new Error(response.statusText);
 };
 
+class ValidHrefError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ValidHrefError";
+  }
+}
+
 function isValidHref(href: string, baseUrl: string) {
   try {
-    const candidate = new URL(href, baseUrl).href;
-    if (!/^https?/.test(candidate))
-      throw new Error("Only interested in http urls");
-    if (!candidate.startsWith(baseUrl))
-      throw new Error("The url is not from the same origin.");
-    return candidate;
-  } catch {
+    const candidate = new URL(href, baseUrl);
+    if (!/^https?/.test(candidate.href))
+      throw new ValidHrefError(
+        `The URL ${candidate.href} is not an http/https URL so we ignore it.}`
+      );
+    if (!candidate.href.startsWith(baseUrl))
+      throw new ValidHrefError(
+        `The url '${candidate.href}' is not from the same origin as '${baseUrl}'. `
+      );
+    if (ignoreUrlsWithHashes && candidate.hash.length > 0)
+      throw new ValidHrefError(
+        `The url has hashes, and the program is setup to ignore urls with hashes, to avoid unnecessary requests => '${candidate.href}'.`
+      );
+    return candidate.href;
+  } catch (error: unknown) {
+    process.exitCode = 1;
+
+    if (error instanceof ValidHrefError) {
+      console.warn(
+        `${yellow}warning${reset} ${error.name} (${programName}): ${error.message}`
+      );
+    } else if (error instanceof Error) {
+      console.warn(
+        `${yellow}warning${reset} ${error.name} (${programName}): ${error.message}`
+      );
+    } else throw error;
+
     return false;
   }
 }
@@ -86,6 +113,9 @@ type State = {
   characters: Set<string>;
 };
 
+// This method has try/catch because, if you think about it,
+// it's the main method. The only reason it's in a different
+// function, it's because of the recursion.
 async function getResults(rootHref: string) {
   const initialState: State = {
     iterations: 0,
@@ -128,10 +158,6 @@ async function getResults(rootHref: string) {
 
       if (newState.iterations === maxIterations || remainingHrefs.length === 0)
         return newState;
-
-      // TODO: Right now, with a single error inside this method, we don't return anything.
-      // If you think about it, this is the main method that should try/catch.
-      // The only reason it's in a different function, it's because of the recursion.
 
       // 5. RETURN RESULTS
       return getResultsInner(remainingHrefs[0], newState);
