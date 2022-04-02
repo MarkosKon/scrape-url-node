@@ -10,7 +10,15 @@ const version = "0.1.0";
 const programName = "scrape-characters";
 const verbose =
   process.argv.includes("-V") || process.argv.includes("--verbose");
-//  TODO parse those program options as option parameters from the user.
+// TODO parse those program options as option parameters from the user.
+// TODO Show remaining URL count in the successful message. Maybe show also how many we processed so far.
+// TODO If the user CTRL + C (even CTRL + D? find the names of those signals), show the current results.
+// TODO Ignore non-HTML content types, to avoid scraping XMLs and images.
+// TODO Print character hex codes in a easy to digest command for CLIs. The console doesn't display well
+// the control characters.
+// TODO Examine if a not found error in fetch stops the script execution. Meaning after the initial root URL.
+// TODO maybe two verbose levels. The first will print the "Sleeping for" message,
+// and the second the "back to it" + is ValidHrefErrors.
 const delay = 5000;
 const maxIterations = 150;
 const ignoreUrlsWithHashes = true;
