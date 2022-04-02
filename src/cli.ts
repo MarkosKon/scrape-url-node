@@ -10,7 +10,6 @@ const version = "0.1.0";
 const programName = "scrape-characters";
 const verbose =
   process.argv.includes("-V") || process.argv.includes("--verbose");
-// TODO If the user CTRL + C (or even CTRL + D? find the names of those signals), show the current results.
 // TODO Print character hex codes in a easy to digest command for CLIs. The console doesn't display well
 // the control characters.
 // TODO Examine if a not found error in fetch stops the script execution. Meaning after the initial root URL.
@@ -21,6 +20,16 @@ const verbose =
 const delay = 5000;
 const maxIterations = 150;
 const ignoreUrlsWithHashes = true;
+let exitNow = false;
+
+process.on("SIGINT", function onInterruptSignal() {
+  console.warn(
+    `${red}warning${reset} (${programName}): Caught interrupt signal and will try to exit as soon as possible. I will also print the results so far. Please wait.`
+  );
+
+  process.exitCode = 1;
+  exitNow = true;
+});
 
 const args = process.argv.slice(2);
 
@@ -163,7 +172,11 @@ async function getResults(rootHref: string) {
         );
       }
 
-      if (newState.iterations === maxIterations || remainingHrefs.length === 0)
+      if (
+        exitNow ||
+        newState.iterations === maxIterations ||
+        remainingHrefs.length === 0
+      )
         return newState;
 
       return getResultsInner(remainingHrefs[0], newState);
@@ -308,9 +321,9 @@ async function getResults(rootHref: string) {
       console.warn(
         `${yellow}warning${reset} (${programName}): Program exited with errors.`
       );
-    } else if (process.exitCode === 0 && verbose) {
+    } else if (process.exitCode === 0) {
       console.info(
-        `${darkGray}info (${programName}): Program exited successfully.${reset}`
+        `${green}success${reset} (${programName}): Program exited successfully without errors.`
       );
     }
   });
