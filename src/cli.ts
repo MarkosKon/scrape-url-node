@@ -86,16 +86,17 @@ class ValidHrefError extends Error {
   }
 }
 
-function isValidHref(href: string, baseUrl: string) {
+function isValidHref(href: string, baseHref: string) {
   try {
+    const baseUrl = new URL(baseHref);
     const candidate = new URL(href, baseUrl);
     if (!/^https?/.test(candidate.href))
       throw new ValidHrefError(
         `The URL ${candidate.href} is not an http/https URL. The program will ignore it.`
       );
-    if (!candidate.href.startsWith(baseUrl))
+    if (!candidate.href.startsWith(baseUrl.origin))
       throw new ValidHrefError(
-        `The url '${candidate.href}' is not from the same origin as '${baseUrl}'. The program will ignore it.`
+        `The url '${candidate.href}' is not from the same origin as '${baseUrl.href}'. The program will ignore it.`
       );
     if (ignoreUrlsWithHashes && candidate.hash.length > 0)
       throw new ValidHrefError(
