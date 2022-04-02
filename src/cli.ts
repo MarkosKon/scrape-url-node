@@ -33,6 +33,15 @@ For bugs and feature requests, please open an issue at https://github.com/your_u
 `);
 }
 
+function difference<T>(setA: Set<T>, setB: Set<T>) {
+  const setDifference = new Set(setA);
+  // eslint-disable-next-line no-restricted-syntax
+  for (const element of setB) {
+    setDifference.delete(element);
+  }
+  return setDifference;
+}
+
 function wrapInQuotes(input: string) {
   return `'${input}'`;
 }
@@ -47,15 +56,92 @@ const checkStatus = (response: Response) => {
   throw new Error(response.statusText);
 };
 
-function isValidHref(href: string, baseUrl?: string | URL) {
+function isValidHref(href: string, baseUrl: string) {
   try {
     const candidate = new URL(href, baseUrl).href;
-    if (!candidate.startsWith("http"))
+    if (!/^https?/.test(candidate))
       throw new Error("Only interested in http urls");
+    if (!candidate.startsWith(baseUrl))
+      throw new Error("The url is not from the same origin.");
     return candidate;
   } catch {
     return false;
   }
+}
+
+type State = {
+  iterations: number;
+  visitedHrefs: Set<string>;
+  legitHrefs: Set<string>;
+  invalidHrefs: Set<string>;
+  characters: Set<string>;
+};
+
+async function getResults(rootHref: string, maxIterations = 1) {
+  const initialState: State = {
+    iterations: 0,
+    visitedHrefs: new Set(),
+    legitHrefs: new Set([rootHref]),
+    invalidHrefs: new Set(),
+    characters: new Set(),
+  };
+
+  async function getResultsInner(
+    currentRootHref: string,
+    state: State
+  ): Promise<State> {
+    // 1. FETCH HTML STRING
+    const response = await fetch(currentRootHref);
+    const body = await checkStatus(response).text();
+    state.visitedHrefs.add(currentRootHref);
+
+    // 2. PARSE HTML STRING
+    const $ = cheerio.load(body);
+
+    // 3. GET LEGIT AND FAILING URLs
+    const hrefs = $("a")
+      .map((_index, element) => $(element).attr("href"))
+      .get();
+    // eslint-disable-next-line no-restricted-syntax
+    for (const href of hrefs) {
+      const candidate = isValidHref(href, rootHref);
+      if (candidate === false) {
+        state.invalidHrefs.add(href);
+      } else {
+        state.legitHrefs.add(candidate);
+      }
+    }
+
+    // 4. GET UNIQUE CHARACTERS
+    const bodyText = $("body").text();
+    const newCharacters = new Set(bodyText);
+    const characters = new Set([...state.characters, ...newCharacters]);
+
+    const newState = {
+      iterations: state.iterations + 1,
+      visitedHrefs: state.visitedHrefs,
+      legitHrefs: state.legitHrefs,
+      invalidHrefs: state.invalidHrefs,
+      characters,
+    };
+
+    const remainingHrefs = Array.from(
+      difference(newState.legitHrefs, newState.visitedHrefs)
+    );
+    console.log({ remainingHrefs });
+    if (newState.iterations === maxIterations || remainingHrefs.length === 0)
+      return newState;
+    // TODO: Add delay into the mix because you might get blocked by the server.
+    // do it with setTimeout(getResultInner(...), delay);
+    // TODO: Right now, with a single error inside this method, we don't return anything.
+    // If you think about it, this is the main method that should try/catch.
+    // The only reason it's in a different function, it's because of the recursion.
+
+    // 5. RETURN RESULTS
+    return getResultsInner(remainingHrefs[0], newState);
+  }
+
+  return getResultsInner(rootHref, initialState);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
@@ -84,7 +170,7 @@ function isValidHref(href: string, baseUrl?: string | URL) {
     }
 
     // 2. GET URL
-    const rootHref = isValidHref(positional[0]);
+    const rootHref = isValidHref(positional[0], positional[0]);
     if (rootHref === false) {
       console.error(
         `${red}error${reset} (${programName}): '${positional[0]}' is not a valid URL. `
@@ -92,51 +178,29 @@ function isValidHref(href: string, baseUrl?: string | URL) {
       process.exit(1);
     }
 
-    // 3. FETCH HTML STRING
-    let body;
     try {
-      const response = await fetch(rootHref);
-      body = await checkStatus(response).text();
+      // 3. GET ALL THE RESULTS
+      const { legitHrefs, invalidHrefs, characters, iterations, visitedHrefs } =
+        await getResults(rootHref);
+
+      // 4. PRINT RESULTS
+      const uniqueCharacterString = setToWrappedString(characters);
+      const goodUrlString = setToWrappedString(legitHrefs);
+      const badUrlString = setToWrappedString(invalidHrefs);
+      const badUrlOutput =
+        badUrlString.length > 0
+          ? `${yellow}your bad URLs (${invalidHrefs.size}) are => ${badUrlString}${reset}, `
+          : "";
+
+      console.log(
+        `${green}success${reset} (${programName}): Visited ${green}${visitedHrefs.size}${reset} URLs in ${green}${iterations}${reset} iterations. Your ${green}root url is '${rootHref}'${reset}, the ${green}good URLs (${legitHrefs.size}) are =>${reset} ${goodUrlString}, ${badUrlOutput}and the ${green}unique characters (${characters.size}) are =>${reset} ${uniqueCharacterString}.`
+      );
     } catch (error: unknown) {
-      console.error(`${red}error${reset} (${programName}): ${String(error)}`);
+      console.error(
+        `${red}error${reset} general (${programName}): ${String(error)}`
+      );
       process.exit(1);
     }
-
-    // 4. PARSE HTML STRING
-    const $ = cheerio.load(body);
-
-    // 5. GET LEGIT AND FAILING URLs
-    const hrefs = $("a")
-      .map((_index, element) => $(element).attr("href"))
-      .get();
-    const invalidHrefs: Set<string> = new Set();
-    const legitHrefs: Set<string> = new Set();
-    // eslint-disable-next-line no-restricted-syntax
-    for (const href of hrefs) {
-      const candidate = isValidHref(href, rootHref);
-      if (candidate === false) {
-        invalidHrefs.add(href);
-      } else {
-        legitHrefs.add(candidate);
-      }
-    }
-
-    // 6. GET UNIQUE CHARACTERS
-    const bodyText = $("body").text();
-    const characters = new Set(bodyText);
-
-    // 7. PRINT RESULTS
-    const uniqueCharacterString = setToWrappedString(characters);
-    const goodUrlString = setToWrappedString(legitHrefs);
-    const badUrlString = setToWrappedString(invalidHrefs);
-    const badUrlOutput =
-      badUrlString.length > 0
-        ? `${yellow}your bad URLs (${invalidHrefs.size}) are => ${badUrlString}${reset}, `
-        : "";
-
-    console.log(
-      `${green}success${reset} (${programName}): Your ${green}root url is '${rootHref}'${reset}, the ${green}good URLs (${legitHrefs.size}) are =>${reset} ${goodUrlString}, ${badUrlOutput}and the ${green}unique characters (${characters.size}) are =>${reset} ${uniqueCharacterString}.`
-    );
 
     if (process.exitCode === undefined) {
       process.exitCode = 0;
