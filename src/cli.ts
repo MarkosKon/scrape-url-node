@@ -10,8 +10,6 @@ const version = "0.1.0";
 const programName = "scrape-characters";
 const verbose =
   process.argv.includes("-V") || process.argv.includes("--verbose");
-// TODO Print character hex codes in a easy to digest command for CLIs. The console doesn't display well
-// the control characters.
 // TODO Examine if a not found error in fetch stops the script execution. Meaning after the initial root URL.
 // TODO maybe two verbose levels. The first will print the "Sleeping for" message,
 // and the second the "back to it" + is ValidHrefErrors.
@@ -24,7 +22,7 @@ let exitNow = false;
 
 process.on("SIGINT", function onInterruptSignal() {
   console.warn(
-    `${red}warning${reset} (${programName}): Caught interrupt signal and will try to exit as soon as possible. I will also print the results so far. Please wait.`
+    `${yellow}warning${reset} (${programName}): Caught interrupt signal and will try to exit as soon as possible. I will also print the results so far. Please wait.`
   );
 
   process.exitCode = 1;
@@ -293,7 +291,23 @@ async function getResults(rootHref: string) {
         await getResults(rootHref);
 
       // 4. PRINT RESULTS
-      const uniqueCharacterString = setToWrappedString(characters);
+      const uniqueCharacterString = Array.from(characters)
+        // If the compare function is omitted, the array elements are converted to strings,
+        // and then sorted according to each character's Unicode code point value.
+        // That's exactly what we want, so that's why we sort first.
+        .sort()
+        .map((character) => {
+          const codePoint = character.codePointAt(0);
+          if (codePoint === undefined) {
+            console.warn(
+              `${yellow}warning${reset} (${programName}): Could not infer a codepoint for character '${character}'.`
+            );
+            process.exitCode = 1;
+          }
+          return codePoint;
+        })
+        .map((codePoint) => codePoint?.toString(16))
+        .join(" ");
       const goodUrlString = setToWrappedString(legitHrefs);
       const badUrlString = setToWrappedString(invalidHrefs);
       const badUrlOutput =
@@ -302,7 +316,7 @@ async function getResults(rootHref: string) {
           : "";
 
       console.log(
-        `${green}success${reset} (${programName}): Visited ${green}${visitedHrefs.size}${reset} URLs in ${green}${iterations}${reset} iterations. Your ${green}root url is '${rootHref}'${reset}, the ${green}good URLs (${legitHrefs.size}) are =>${reset} ${goodUrlString}, ${badUrlOutput}and the ${green}unique characters (${characters.size}) are =>${reset} ${uniqueCharacterString}.`
+        `${green}success${reset} (${programName}): Visited ${green}${visitedHrefs.size}${reset} URLs in ${green}${iterations}${reset} iterations. Your ${green}root url is '${rootHref}'${reset}, the ${green}good URLs (${legitHrefs.size}) are =>${reset} ${goodUrlString}, ${badUrlOutput}and the ${green}unique characters (${characters.size}) in hex are =>${reset} '${uniqueCharacterString}'.`
       );
     } catch (error: unknown) {
       console.error(
