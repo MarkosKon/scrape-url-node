@@ -10,7 +10,7 @@ const version = "0.1.0";
 const programName = "scrape-characters";
 const verbose =
   process.argv.includes("-V") || process.argv.includes("--verbose");
-const delay = 0;
+const delay = 1000;
 
 const args = process.argv.slice(2);
 
@@ -40,6 +40,12 @@ function difference<T>(setA: Set<T>, setB: Set<T>) {
     setDifference.delete(element);
   }
   return setDifference;
+}
+
+async function sleepFor(milliseconds: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
 }
 
 function wrapInQuotes(input: string) {
@@ -90,10 +96,11 @@ async function getResults(rootHref: string, maxIterations = 1) {
     currentRootHref: string,
     state: State
   ): Promise<State> {
+    performance.mark("get-results-inner-start");
     // 1. FETCH HTML STRING
+    state.visitedHrefs.add(currentRootHref);
     const response = await fetch(currentRootHref);
     const body = await checkStatus(response).text();
-    state.visitedHrefs.add(currentRootHref);
 
     // 2. PARSE HTML STRING
     const $ = cheerio.load(body);
@@ -104,7 +111,7 @@ async function getResults(rootHref: string, maxIterations = 1) {
       .get();
     // eslint-disable-next-line no-restricted-syntax
     for (const href of hrefs) {
-      const candidate = isValidHref(href, rootHref);
+      const candidate = isValidHref(href, rootHref); // isValidHref doesn't throw, so it's safe outside of try/catch.
       if (candidate === false) {
         state.invalidHrefs.add(href);
       } else {
@@ -128,11 +135,33 @@ async function getResults(rootHref: string, maxIterations = 1) {
     const remainingHrefs = Array.from(
       difference(newState.legitHrefs, newState.visitedHrefs)
     );
+
+    performance.mark("get-results-inner-end");
+    const { duration: executionTime } = performance.measure(
+      "get-results-inner",
+      "get-results-inner-start",
+      "get-results-inner-end"
+    );
     console.log({ remainingHrefs });
+
+    const timeToSleep = delay - executionTime;
+    if (verbose) {
+      console.info(
+        `${darkGray}info (${programName}): Sleeping for ${Number(
+          timeToSleep
+        ).toFixed(0)} milliseconds to avoid server bans.${reset}`
+      );
+    }
+    await sleepFor(timeToSleep);
+    if (verbose) {
+      console.info(
+        `${darkGray}info (${programName}): Well, back to it! Those URLs ain't going to download themselves, huha!${reset}`
+      );
+    }
+
     if (newState.iterations === maxIterations || remainingHrefs.length === 0)
       return newState;
-    // TODO: Add delay into the mix because you might get blocked by the server.
-    // do it with setTimeout(getResultInner(...), delay);
+
     // TODO: Right now, with a single error inside this method, we don't return anything.
     // If you think about it, this is the main method that should try/catch.
     // The only reason it's in a different function, it's because of the recursion.
