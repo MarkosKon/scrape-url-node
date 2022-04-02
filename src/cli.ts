@@ -12,7 +12,7 @@ const verbose =
   process.argv.includes("-V") || process.argv.includes("--verbose");
 //  TODO parse those program options as option parameters from the user.
 const delay = 5000;
-const maxIterations = 50;
+const maxIterations = 150;
 const ignoreUrlsWithHashes = true;
 
 const args = process.argv.slice(2);
@@ -77,11 +77,11 @@ function isValidHref(href: string, baseUrl: string) {
     const candidate = new URL(href, baseUrl);
     if (!/^https?/.test(candidate.href))
       throw new ValidHrefError(
-        `The URL ${candidate.href} is not an http/https URL so we ignore it.}`
+        `The URL ${candidate.href} is not an http/https URL. The program will ignore it.`
       );
     if (!candidate.href.startsWith(baseUrl))
       throw new ValidHrefError(
-        `The url '${candidate.href}' is not from the same origin as '${baseUrl}'. `
+        `The url '${candidate.href}' is not from the same origin as '${baseUrl}'. The program will ignore it.`
       );
     if (ignoreUrlsWithHashes && candidate.hash.length > 0)
       throw new ValidHrefError(
@@ -89,16 +89,16 @@ function isValidHref(href: string, baseUrl: string) {
       );
     return candidate.href;
   } catch (error: unknown) {
-    process.exitCode = 1;
-
     if (error instanceof ValidHrefError) {
-      console.warn(
-        `${yellow}warning${reset} ${error.name} (${programName}): ${error.message}`
-      );
+      if (verbose)
+        console.warn(
+          `${yellow}warning${darkGray} ${error.name} (${programName}): ${error.message}${reset}`
+        );
     } else if (error instanceof Error) {
-      console.warn(
-        `${yellow}warning${reset} ${error.name} (${programName}): ${error.message}`
-      );
+      if (verbose)
+        console.warn(
+          `${yellow}warning${darkGray} ${error.name} (${programName}): ${error.message}${reset}`
+        );
     } else throw error;
 
     return false;
@@ -180,7 +180,7 @@ async function getResults(rootHref: string) {
         .get();
       // eslint-disable-next-line no-restricted-syntax
       for (const href of hrefs) {
-        const candidate = isValidHref(href, rootHref); // isValidHref doesn't throw, by the way.
+        const candidate = isValidHref(href, rootHref); // isValidHref doesn't throw, by the way, unless the error is not an instance of Error.
         if (candidate === false) {
           state.invalidHrefs.add(href);
         } else {
@@ -202,11 +202,16 @@ async function getResults(rootHref: string) {
       };
     } catch (error: unknown) {
       console.error(
-        `${red}error${reset} getResults (${programName}): ${String(error)}`
+        `${red}error${reset} getResults (${programName}): Processed the url '${currentRootHref}' with errors => ${String(
+          error
+        )}`
       );
       process.exitCode = 1;
       return await whatToDoNext(newState);
     }
+    console.info(
+      `${green}success${reset} (${programName}): Processed the url '${currentRootHref}' successfully.`
+    );
     return whatToDoNext(newState);
   }
 
