@@ -10,7 +10,10 @@ const version = "0.1.0";
 const programName = "scrape-characters";
 const verbose =
   process.argv.includes("-V") || process.argv.includes("--verbose");
-const delay = 1000;
+//  TODO parse those program options as option parameters from the user.
+const delay = 5000;
+const maxIterations = 50;
+const ignoreUrlsWithHashes = true;
 
 const args = process.argv.slice(2);
 
@@ -83,7 +86,7 @@ type State = {
   characters: Set<string>;
 };
 
-async function getResults(rootHref: string, maxIterations = 1) {
+async function getResults(rootHref: string) {
   const initialState: State = {
     iterations: 0,
     visitedHrefs: new Set(),
@@ -96,78 +99,89 @@ async function getResults(rootHref: string, maxIterations = 1) {
     currentRootHref: string,
     state: State
   ): Promise<State> {
-    performance.mark("get-results-inner-start");
-    // 1. FETCH HTML STRING
-    state.visitedHrefs.add(currentRootHref);
-    const response = await fetch(currentRootHref);
-    const body = await checkStatus(response).text();
+    async function whatToDoNext(newState: State) {
+      const remainingHrefs = Array.from(
+        difference(newState.legitHrefs, newState.visitedHrefs)
+      );
 
-    // 2. PARSE HTML STRING
-    const $ = cheerio.load(body);
+      performance.mark("get-results-inner-end");
+      const { duration: executionTime } = performance.measure(
+        "get-results-inner",
+        "get-results-inner-start",
+        "get-results-inner-end"
+      );
 
-    // 3. GET LEGIT AND FAILING URLs
-    const hrefs = $("a")
-      .map((_index, element) => $(element).attr("href"))
-      .get();
-    // eslint-disable-next-line no-restricted-syntax
-    for (const href of hrefs) {
-      const candidate = isValidHref(href, rootHref); // isValidHref doesn't throw, so it's safe outside of try/catch.
-      if (candidate === false) {
-        state.invalidHrefs.add(href);
-      } else {
-        state.legitHrefs.add(candidate);
+      const timeToSleep = delay - executionTime;
+      if (verbose) {
+        console.info(
+          `${darkGray}info (${programName}): Sleeping for ${Number(
+            timeToSleep
+          ).toFixed(0)} milliseconds to avoid server bans.${reset}`
+        );
       }
+      await sleepFor(timeToSleep);
+      if (verbose) {
+        console.info(
+          `${darkGray}info (${programName}): Well, back to it! Those URLs ain't going to download themselves, huha!${reset}`
+        );
+      }
+
+      if (newState.iterations === maxIterations || remainingHrefs.length === 0)
+        return newState;
+
+      // TODO: Right now, with a single error inside this method, we don't return anything.
+      // If you think about it, this is the main method that should try/catch.
+      // The only reason it's in a different function, it's because of the recursion.
+
+      // 5. RETURN RESULTS
+      return getResultsInner(remainingHrefs[0], newState);
     }
 
-    // 4. GET UNIQUE CHARACTERS
-    const bodyText = $("body").text();
-    const newCharacters = new Set(bodyText);
-    const characters = new Set([...state.characters, ...newCharacters]);
+    performance.mark("get-results-inner-start");
+    let newState: State = state;
+    try {
+      // 1. FETCH HTML STRING
+      state.visitedHrefs.add(currentRootHref);
+      const response = await fetch(currentRootHref);
+      const body = await checkStatus(response).text();
 
-    const newState = {
-      iterations: state.iterations + 1,
-      visitedHrefs: state.visitedHrefs,
-      legitHrefs: state.legitHrefs,
-      invalidHrefs: state.invalidHrefs,
-      characters,
-    };
+      // 2. PARSE HTML STRING
+      const $ = cheerio.load(body);
 
-    const remainingHrefs = Array.from(
-      difference(newState.legitHrefs, newState.visitedHrefs)
-    );
+      // 3. GET LEGIT AND FAILING URLs
+      const hrefs = $("a")
+        .map((_index, element) => $(element).attr("href"))
+        .get();
+      // eslint-disable-next-line no-restricted-syntax
+      for (const href of hrefs) {
+        const candidate = isValidHref(href, rootHref); // isValidHref doesn't throw, by the way.
+        if (candidate === false) {
+          state.invalidHrefs.add(href);
+        } else {
+          state.legitHrefs.add(candidate);
+        }
+      }
 
-    performance.mark("get-results-inner-end");
-    const { duration: executionTime } = performance.measure(
-      "get-results-inner",
-      "get-results-inner-start",
-      "get-results-inner-end"
-    );
-    console.log({ remainingHrefs });
+      // 4. GET UNIQUE CHARACTERS
+      const bodyText = $("body").text();
+      const newCharacters = new Set(bodyText);
+      const characters = new Set([...state.characters, ...newCharacters]);
 
-    const timeToSleep = delay - executionTime;
-    if (verbose) {
-      console.info(
-        `${darkGray}info (${programName}): Sleeping for ${Number(
-          timeToSleep
-        ).toFixed(0)} milliseconds to avoid server bans.${reset}`
+      newState = {
+        iterations: state.iterations + 1,
+        visitedHrefs: state.visitedHrefs,
+        legitHrefs: state.legitHrefs,
+        invalidHrefs: state.invalidHrefs,
+        characters,
+      };
+    } catch (error: unknown) {
+      console.error(
+        `${red}error${reset} getResults (${programName}): ${String(error)}`
       );
+      process.exitCode = 1;
+      return await whatToDoNext(newState);
     }
-    await sleepFor(timeToSleep);
-    if (verbose) {
-      console.info(
-        `${darkGray}info (${programName}): Well, back to it! Those URLs ain't going to download themselves, huha!${reset}`
-      );
-    }
-
-    if (newState.iterations === maxIterations || remainingHrefs.length === 0)
-      return newState;
-
-    // TODO: Right now, with a single error inside this method, we don't return anything.
-    // If you think about it, this is the main method that should try/catch.
-    // The only reason it's in a different function, it's because of the recursion.
-
-    // 5. RETURN RESULTS
-    return getResultsInner(remainingHrefs[0], newState);
+    return whatToDoNext(newState);
   }
 
   return getResultsInner(rootHref, initialState);
