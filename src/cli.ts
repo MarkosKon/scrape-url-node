@@ -10,8 +10,7 @@ const version = "0.1.0";
 const programName = "scrape-characters";
 const verbose =
   process.argv.includes("-V") || process.argv.includes("--verbose");
-// TODO If the user CTRL + C (even CTRL + D? find the names of those signals), show the current results.
-// TODO Ignore non-HTML content types, to avoid scraping XMLs and images.
+// TODO If the user CTRL + C (or even CTRL + D? find the names of those signals), show the current results.
 // TODO Print character hex codes in a easy to digest command for CLIs. The console doesn't display well
 // the control characters.
 // TODO Examine if a not found error in fetch stops the script execution. Meaning after the initial root URL.
@@ -167,7 +166,6 @@ async function getResults(rootHref: string) {
       if (newState.iterations === maxIterations || remainingHrefs.length === 0)
         return newState;
 
-      // 5. RETURN RESULTS
       return getResultsInner(remainingHrefs[0], newState);
     }
 
@@ -176,8 +174,24 @@ async function getResults(rootHref: string) {
     try {
       // 1. FETCH HTML STRING
       state.visitedHrefs.add(currentRootHref);
-      const response = await fetch(currentRootHref);
-      const body = await checkStatus(response).text();
+      const response = await fetch(currentRootHref, {
+        headers: {
+          Accept: "text/html",
+        },
+      });
+      const responseOk = checkStatus(response);
+
+      const contentType = responseOk.headers.get("content-type");
+      if (typeof contentType !== "string")
+        throw new Error(
+          `Checked the content-type header and got back null for the url '${currentRootHref}'. The program will ignore this URL.`
+        );
+      if (!contentType.includes("text/html"))
+        throw new Error(
+          `The content-type header for url '${currentRootHref}' is '${contentType}'. The program accepts only text/html as content-type in the response.`
+        );
+
+      const body = await responseOk.text();
 
       // 2. PARSE HTML STRING
       const $ = cheerio.load(body);
