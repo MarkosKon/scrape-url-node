@@ -264,18 +264,20 @@ async function getResults(rootHref: string) {
       );
 
       const timeToSleep = delay - executionTime;
-      if (verbose) {
-        console.info(
-          `${darkGray}info (${programName}): Sleeping for ${Number(
-            timeToSleep
-          ).toFixed(0)} milliseconds to avoid server bans.${reset}`
-        );
-      }
-      await sleepFor(timeToSleep);
-      if (verbose) {
-        console.info(
-          `${darkGray}info (${programName}): Well, back to it! Those URLs ain't going to download themselves, huha!${reset}`
-        );
+      if (timeToSleep > 0) {
+        if (verbose) {
+          console.info(
+            `${darkGray}info (${programName}): Sleeping for ${Number(
+              timeToSleep
+            ).toFixed(0)} milliseconds to avoid server bans.${reset}`
+          );
+        }
+        await sleepFor(timeToSleep);
+        if (verbose) {
+          console.info(
+            `${darkGray}info (${programName}): Well, back to it! Those URLs ain't going to download themselves, huha!${reset}`
+          );
+        }
       }
 
       if (
