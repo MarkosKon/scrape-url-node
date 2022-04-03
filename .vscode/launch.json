@@ -10,10 +10,9 @@
       "name": "Launch cli",
       "skipFiles": ["<node_internals>/**"],
       "program": "${workspaceFolder}\\src\\cli.ts",
-      //   "outFiles": ["${workspaceFolder}/out/*.js"],
       "outFiles": ["${workspaceFolder}/**/*.js"],
-      "preLaunchTask": "tsc: build - tsconfig.json",
-      "args": ["package.json"]
+      "preLaunchTask": "npm: build",
+      "args": ["https://example.com/"]
     }
   ]
 }
