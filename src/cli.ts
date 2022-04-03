@@ -293,7 +293,7 @@ async function getResults(rootHref: string) {
     performance.mark("get-results-inner-start");
     let newState: State = state;
     try {
-      // 1. FETCH HTML STRING
+      // 1. Fetch HTML string.
       state.visitedHrefs.add(currentRootHref);
       const response = await fetch(currentRootHref, {
         headers: {
@@ -314,16 +314,16 @@ async function getResults(rootHref: string) {
 
       const body = await responseOk.text();
 
-      // 2. PARSE HTML STRING
+      // 2. Parse HTML string.
       const $ = cheerio.load(body);
 
-      // 3. GET LEGIT AND FAILING URLs
+      // 3. Get legit and failing URLs.
       const hrefs = $("a")
         .map((_index, element) => $(element).attr("href"))
         .get();
       // eslint-disable-next-line no-restricted-syntax
       for (const href of hrefs) {
-        const candidate = isValidHref(href, rootHref); // isValidHref doesn't throw, by the way, unless the error is not an instance of Error.
+        const candidate = isValidHref(href, rootHref); // isValidHref throw only when the error is not an instance of Error.
         if (candidate === false) {
           state.invalidHrefs.add(href);
         } else {
@@ -331,7 +331,7 @@ async function getResults(rootHref: string) {
         }
       }
 
-      // 4. GET UNIQUE CHARACTERS
+      // 4. Get unique characters.
       const bodyText = $("body").text();
       const newCharacters = new Set(bodyText);
       const characters = new Set([...state.characters, ...newCharacters]);
@@ -363,7 +363,6 @@ async function getResults(rootHref: string) {
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
 (async function main() {
-  // 1. GET POSITIONAL ARGUMENTS
   if (urls.length === 0) {
     printHelp();
     console.error(
@@ -395,7 +394,6 @@ ${JSON.stringify(
     );
   }
 
-  // 2. GET URL
   const rootHref = isValidHref(urls[0], urls[0]);
   if (rootHref === false) {
     console.error(
@@ -405,11 +403,9 @@ ${JSON.stringify(
   }
 
   try {
-    // 3. GET ALL THE RESULTS
     const { legitHrefs, invalidHrefs, characters, iterations, visitedHrefs } =
       await getResults(rootHref);
 
-    // 4. PRINT RESULTS
     const uniqueCharacterString = Array.from(characters)
       // If the compare function is omitted, the array elements are converted to strings,
       // and then sorted according to each character's Unicode code point value.
