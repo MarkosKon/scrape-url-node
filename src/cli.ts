@@ -8,18 +8,134 @@ import { darkGray, green, red, reset, yellow } from "./colors.js";
 
 const version = "0.1.0";
 const programName = "scrape-characters";
-const verbose =
-  process.argv.includes("-V") || process.argv.includes("--verbose");
+const repositoryName = "scrape-url-node";
+
 // TODO Examine if a not found error in fetch stops the script execution. Meaning after the initial root URL.
 // TODO maybe two verbose levels. The first will print the "Sleeping for" message,
 // and the second the "back to it" + is ValidHrefErrors.
 
-// TODO parse those program options as option parameters from the user.
-const delay = 5000;
-const maxIterations = 150;
-const ignoreUrlsWithHashes = true;
-let exitNow = false;
+let verbose = false;
+let ignoreUrlsWithHashes = true;
+let delay = 5000;
+let maxIterations = 150;
+const urls: string[] = [];
 
+function printHelp() {
+  console.log(`Usage: ${programName} [OPTION].. <URL>
+
+Scrapes from an initial URL linked URLs, under the same origin, recursively.
+It then reports in the console:
+
+1) The unique characters from the HTML pages it visited.
+2) The URLs it discovered and visited. In other words, you get a list with all
+   the linked pages under the same origin.
+3) A list of URLs it discovered and not visited because they are not from the
+   same origin. In other words, you get a list with all the URLs you link to
+   (this list also includes URLs with hashes and non http/https, though).
+
+Required arguments:
+  <URL>                                  The initial URL to start scraping from.
+
+Options:
+  -d, --delay <milliseconds>             The delay between each fetch to avoid server bans.
+                                         the default is ${delay} milliseconds.
+  -m, --max-iterations                   The maximum number of URLs to visit. The default
+                                         is ${maxIterations}.
+  -t, --hashtags,                        Whether to ignore URLs with hashes. The default
+  --no-t, --no-hashtags                  is ${String(ignoreUrlsWithHashes)}.
+  -V, --verbose, no-V, --no-verbose      Show additional information during execution.
+  -v, --version                          Show the version number.
+  -h, --help                             Show this help menu.
+
+Examples:
+  1) ${programName} https://www.example.com/
+  2) ${programName} -d 3000 https://www.example.com/
+  3) ${programName} -m 10 https://www.example.com/
+
+Made by Markos Konstantopoulos (https://markoskon.com). For bugs and feature
+requests, please open an issue at https://github.com/MarkosKon/${repositoryName}/issues.
+`);
+}
+
+const argsCopy = [...process.argv.slice(2)];
+
+while (argsCopy.length > 0) {
+  // Using if/elseif instead of switch because I want to
+  // use regular expressions for unknown options, at the end.
+
+  // eslint-disable-next-line unicorn/prefer-switch
+  if (argsCopy[0] === "-h" || argsCopy[0] === "--help") {
+    printHelp();
+    process.exit(0);
+  } else if (argsCopy[0] === "-v" || argsCopy[0] === "--version") {
+    console.log(version);
+    process.exit(0);
+  } else if (argsCopy[0] === "-V" || argsCopy[0] === "--verbose") {
+    verbose = true;
+  } else if (/^--?d(elay)?/.test(argsCopy[0])) {
+    try {
+      if (argsCopy[0].includes("=")) {
+        delay = Number(argsCopy[0].split("=")[1]);
+      } else {
+        delay = Number(argsCopy[1]);
+        argsCopy.shift();
+      }
+    } catch {
+      console.error(
+        `${red}error${reset} ${programName}: A number for -d, --delay is required. For example, '${programName} -d 3000 https://example.com/'.`
+      );
+      process.exitCode = 1;
+      process.exit(1);
+    }
+
+    if (Number.isNaN(delay)) {
+      console.error(
+        `${red}error${reset} ${programName}: The -d, --delay must be a number but got NaN.`
+      );
+      process.exitCode = 1;
+      process.exit(1);
+    }
+  } else if (/^--?m(max-iterations)?/.test(argsCopy[0])) {
+    try {
+      if (argsCopy[0].includes("=")) {
+        maxIterations = Number(argsCopy[0].split("=")[1]);
+      } else {
+        maxIterations = Number(argsCopy[1]);
+        argsCopy.shift();
+      }
+    } catch {
+      console.error(
+        `${red}error${reset} ${programName}: A number for -m, --max-iterations is required. For example, '${programName} -m 25 https://example.com/'.`
+      );
+      process.exitCode = 1;
+      process.exit(1);
+    }
+
+    if (Number.isNaN(maxIterations)) {
+      console.error(
+        `${red}error${reset} ${programName}: The -m, --max-iterations must be a number but got NaN.`
+      );
+      process.exitCode = 1;
+      process.exit(1);
+    }
+  } else if (argsCopy[0] === "-t" || argsCopy[0] === "--hashtags") {
+    ignoreUrlsWithHashes = false;
+  } else if (argsCopy[0] === "--no-t" || argsCopy[0] === "--no-hashtags") {
+    ignoreUrlsWithHashes = true;
+  } else if (/--?.*/.test(argsCopy[0])) {
+    console.error(
+      `${red}error${reset} ${programName}: Unknown option '${argsCopy[0]}'.`
+    );
+    process.exitCode = 1;
+    process.exit(1);
+  } else {
+    urls.push(argsCopy[0]);
+  }
+
+  argsCopy.shift();
+}
+
+let exitNow = false;
 process.on("SIGINT", function onInterruptSignal() {
   console.warn(
     `${yellow}warning${reset} (${programName}): Caught interrupt signal and will try to exit as soon as possible. I will also print the results so far. Please wait.`
@@ -29,26 +145,17 @@ process.on("SIGINT", function onInterruptSignal() {
   exitNow = true;
 });
 
-const args = process.argv.slice(2);
-
-function printHelp() {
-  console.log(`Usage: ${programName} [OPTION].. <URL>
-
-Get unique page characters from the URL and its linked pages that are under the same domain.
-
-Options:
-  -V, --verbose              : Show additional information during execution.
-  -v, --version              : Show the version number.
-  -h, --help                 : Show this help menu.
-
-Examples:
-  1) ${programName} --pwd
-  2) ${programName} -h
-
-Made by Markos Konstantopoulos (https://markoskon.com).
-For bugs and feature requests, please open an issue at https://github.com/your_username/your_repo/issues.
-`);
-}
+process.on("exit", function onExit() {
+  if (process.exitCode !== undefined && process.exitCode !== 0) {
+    console.warn(
+      `${yellow}warning${reset} (${programName}): Program exited with errors.`
+    );
+  } else if (process.exitCode === 0) {
+    console.info(
+      `${green}success${reset} (${programName}): Program exited successfully without errors.`
+    );
+  }
+});
 
 function difference<T>(setA: Set<T>, setB: Set<T>) {
   const setDifference = new Set(setA);
@@ -254,92 +361,88 @@ async function getResults(rootHref: string) {
 
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
 (async function main() {
-  if (args.includes("--help") || args.includes("-h")) {
+  // 1. GET POSITIONAL ARGUMENTS
+  if (urls.length === 0) {
     printHelp();
-    process.exit(0);
-  } else if (args.includes("--version") || args.includes("-v")) {
-    console.log(version);
-    process.exit(0);
-  } else {
-    // 1. GET POSITIONAL ARGUMENTS
-    const positional = args.filter((_argument) => !_argument.startsWith("-"));
-    if (positional.length === 0) {
-      printHelp();
-      console.error(
-        `${red}error${reset} (${programName}): Please provide a URL.`
-      );
-      process.exit(1);
-    }
-
-    if (positional.length > 1) {
-      console.warn(
-        `${yellow}warning${reset} (${programName}): You provided ${positional.length} URLs, but the program accepts only 1 at them moment.`
-      );
-    }
-
-    // 2. GET URL
-    const rootHref = isValidHref(positional[0], positional[0]);
-    if (rootHref === false) {
-      console.error(
-        `${red}error${reset} (${programName}): '${positional[0]}' is not a valid URL. `
-      );
-      process.exit(1);
-    }
-
-    try {
-      // 3. GET ALL THE RESULTS
-      const { legitHrefs, invalidHrefs, characters, iterations, visitedHrefs } =
-        await getResults(rootHref);
-
-      // 4. PRINT RESULTS
-      const uniqueCharacterString = Array.from(characters)
-        // If the compare function is omitted, the array elements are converted to strings,
-        // and then sorted according to each character's Unicode code point value.
-        // That's exactly what we want, so that's why we sort first.
-        .sort()
-        .map((character) => {
-          const codePoint = character.codePointAt(0);
-          if (codePoint === undefined) {
-            console.warn(
-              `${yellow}warning${reset} (${programName}): Could not infer a codepoint for character '${character}'.`
-            );
-            process.exitCode = 1;
-          }
-          return codePoint;
-        })
-        .map((codePoint) => codePoint?.toString(16))
-        .join(" ");
-      const goodUrlString = setToWrappedString(legitHrefs);
-      const badUrlString = setToWrappedString(invalidHrefs);
-      const badUrlOutput =
-        badUrlString.length > 0
-          ? `${yellow}your bad URLs (${invalidHrefs.size}) are => ${badUrlString}${reset}, `
-          : "";
-
-      console.log(
-        `${green}success${reset} (${programName}): Visited ${green}${visitedHrefs.size}${reset} URLs in ${green}${iterations}${reset} iterations. Your ${green}root url is '${rootHref}'${reset}, the ${green}good URLs (${legitHrefs.size}) are =>${reset} ${goodUrlString}, ${badUrlOutput}and the ${green}unique characters (${characters.size}) in hex are =>${reset} '${uniqueCharacterString}'.`
-      );
-    } catch (error: unknown) {
-      console.error(
-        `${red}error${reset} general (${programName}): ${String(error)}`
-      );
-      process.exit(1);
-    }
-
-    if (process.exitCode === undefined) {
-      process.exitCode = 0;
-    }
+    console.error(
+      `${red}error${reset} (${programName}): Please provide a URL.`
+    );
+    process.exit(1);
   }
 
-  process.on("exit", function onExit() {
-    if (process.exitCode !== undefined && process.exitCode !== 0) {
-      console.warn(
-        `${yellow}warning${reset} (${programName}): Program exited with errors.`
-      );
-    } else if (process.exitCode === 0) {
-      console.info(
-        `${green}success${reset} (${programName}): Program exited successfully without errors.`
-      );
-    }
-  });
+  if (urls.length > 1) {
+    console.warn(
+      `${yellow}warning${reset} (${programName}): You provided ${urls.length} URLs, but the program accepts only 1 at the moment.`
+    );
+  }
+
+  if (verbose) {
+    console.info(
+      `${darkGray}info (${programName}): Program options at runtime:
+${JSON.stringify(
+  {
+    delay,
+    maxIterations,
+    ignoreUrlsWithHashes,
+    verbose,
+    urls,
+  },
+  undefined,
+  2
+)}${reset}`
+    );
+  }
+
+  // 2. GET URL
+  const rootHref = isValidHref(urls[0], urls[0]);
+  if (rootHref === false) {
+    console.error(
+      `${red}error${reset} (${programName}): '${urls[0]}' is not a valid URL. `
+    );
+    process.exit(1);
+  }
+
+  try {
+    // 3. GET ALL THE RESULTS
+    const { legitHrefs, invalidHrefs, characters, iterations, visitedHrefs } =
+      await getResults(rootHref);
+
+    // 4. PRINT RESULTS
+    const uniqueCharacterString = Array.from(characters)
+      // If the compare function is omitted, the array elements are converted to strings,
+      // and then sorted according to each character's Unicode code point value.
+      // That's exactly what we want, so that's why we sort first.
+      .sort()
+      .map((character) => {
+        const codePoint = character.codePointAt(0);
+        if (codePoint === undefined) {
+          console.warn(
+            `${yellow}warning${reset} (${programName}): Could not infer a codepoint for character '${character}'.`
+          );
+          process.exitCode = 1;
+        }
+        return codePoint;
+      })
+      .map((codePoint) => codePoint?.toString(16))
+      .join(" ");
+    const goodUrlString = setToWrappedString(legitHrefs);
+    const badUrlString = setToWrappedString(invalidHrefs);
+    const badUrlOutput =
+      badUrlString.length > 0
+        ? `${yellow}your bad URLs (${invalidHrefs.size}) are => ${badUrlString}${reset}, `
+        : "";
+
+    console.log(
+      `${green}success${reset} (${programName}): Visited ${green}${visitedHrefs.size}${reset} URLs in ${green}${iterations}${reset} iterations. Your ${green}root url is '${rootHref}'${reset}, the ${green}good URLs (${legitHrefs.size}) are =>${reset} ${goodUrlString}, ${badUrlOutput}and the ${green}unique characters (${characters.size}) in hex are =>${reset} '${uniqueCharacterString}'.`
+    );
+  } catch (error: unknown) {
+    console.error(
+      `${red}error${reset} general (${programName}): ${String(error)}`
+    );
+    process.exit(1);
+  }
+
+  if (process.exitCode === undefined) {
+    process.exitCode = 0;
+  }
 })();
