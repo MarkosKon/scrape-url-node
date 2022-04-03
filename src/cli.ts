@@ -122,7 +122,7 @@ while (argsCopy.length > 0) {
     ignoreUrlsWithHashes = false;
   } else if (argsCopy[0] === "--no-t" || argsCopy[0] === "--no-hashtags") {
     ignoreUrlsWithHashes = true;
-  } else if (/--?.*/.test(argsCopy[0])) {
+  } else if (/^--?.*/.test(argsCopy[0])) {
     console.error(
       `${red}error${reset} ${programName}: Unknown option '${argsCopy[0]}'.`
     );
