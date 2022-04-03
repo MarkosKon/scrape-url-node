@@ -403,6 +403,10 @@ ${JSON.stringify(
   }
 
   try {
+    console.info(
+      `${darkGray}info (${programName}): The delay between each request is ${delay}ms.${reset}`
+    );
+
     const { legitHrefs, invalidHrefs, characters, iterations, visitedHrefs } =
       await getResults(rootHref);
 
