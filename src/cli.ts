@@ -18,6 +18,7 @@ let verbose = false;
 let ignoreUrlsWithHashes = true;
 let delay = 5000;
 let maxIterations = 150;
+let exclude: RegExp | undefined;
 const urls: string[] = [];
 
 function printHelp() {
@@ -41,6 +42,7 @@ Options:
                                          the default is ${delay} milliseconds.
   -m, --max-iterations                   The maximum number of URLs to visit. The default
                                          is ${maxIterations}.
+  -e, --exclude                          URLs to exclude in a regular expression.
   -t, --hashtags,                        Whether to ignore URLs with hashes. The default
   --no-t, --no-hashtags                  is ${String(ignoreUrlsWithHashes)}.
   -V, --verbose, no-V, --no-verbose      Show additional information during execution.
@@ -115,6 +117,30 @@ while (argsCopy.length > 0) {
       console.error(
         `${red}error${reset} ${programName}: The -m, --max-iterations must be a number but got NaN.`
       );
+      process.exitCode = 1;
+      process.exit(1);
+    }
+  } else if (/^--?e(xclude)?/.test(argsCopy[0])) {
+    try {
+      if (argsCopy[0].includes("=")) {
+        const regularExpressionString = argsCopy[0].split("=", 2)[1];
+        if (!regularExpressionString)
+          throw new Error(
+            `Please provide a regular expression, for example, '${programName} ${yellow}-e="api"${reset} https://example.com'`
+          );
+        exclude = new RegExp(regularExpressionString);
+      } else {
+        if (argsCopy[1] === undefined)
+          throw new Error(
+            `Please provide a regular expression, for example, '${programName} ${yellow}-e "api"${reset} https://example.com'`
+          );
+        exclude = new RegExp(argsCopy[1]);
+        argsCopy.shift();
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error)
+        console.error(`${red}error${reset} ${programName}: ${error.message}.`);
+      else throw error;
       process.exitCode = 1;
       process.exit(1);
     }
@@ -209,6 +235,16 @@ function isValidHref(href: string, baseHref: string) {
       throw new ValidHrefError(
         `The url has hashes, and the program is setup to ignore urls with hashes, to avoid unnecessary requests => '${candidate.href}'.`
       );
+    if (
+      exclude !== undefined &&
+      exclude.test(candidate.href.split(baseUrl.href)[1])
+    )
+      throw new ValidHrefError(
+        `The url '${
+          candidate.href
+        }' matches the exclude regular expression '${exclude.toString()}'. The program will ignore it.`
+      );
+
     return candidate.href;
   } catch (error: unknown) {
     if (error instanceof ValidHrefError) {
@@ -384,6 +420,7 @@ ${JSON.stringify(
   {
     delay,
     maxIterations,
+    exclude: exclude?.toString(),
     ignoreUrlsWithHashes,
     verbose,
     urls,
