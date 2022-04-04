@@ -282,49 +282,54 @@ async function getResults(rootHref: string) {
     characters: new Set(),
   };
 
+  async function whatToDoNext(
+    newState: State,
+    // Using callback instead of getResultsInner to avoid
+    // re-declaring the whatToDoNext inside getResultsInner.
+    callback: typeof getResultsInner
+  ) {
+    const remainingHrefs = Array.from(
+      difference(newState.legitHrefs, newState.visitedHrefs)
+    );
+
+    performance.mark("get-results-inner-end");
+    const { duration: executionTime } = performance.measure(
+      "get-results-inner",
+      "get-results-inner-start",
+      "get-results-inner-end"
+    );
+
+    const timeToSleep = delay - executionTime;
+    if (timeToSleep > 0) {
+      if (verbose) {
+        console.info(
+          `${darkGray}info (${programName}): Sleeping for ${Number(
+            timeToSleep
+          ).toFixed(0)} milliseconds to avoid server bans.${reset}`
+        );
+      }
+      await sleepFor(timeToSleep);
+      if (verbose) {
+        console.info(
+          `${darkGray}info (${programName}): Well, back to it! Those URLs ain't going to download themselves, huha!${reset}`
+        );
+      }
+    }
+
+    if (
+      exitNow ||
+      newState.iterations === maxIterations ||
+      remainingHrefs.length === 0
+    )
+      return newState;
+
+    return callback(remainingHrefs[0], newState);
+  }
+
   async function getResultsInner(
     currentRootHref: string,
     state: State
   ): Promise<State> {
-    async function whatToDoNext(newState: State) {
-      const remainingHrefs = Array.from(
-        difference(newState.legitHrefs, newState.visitedHrefs)
-      );
-
-      performance.mark("get-results-inner-end");
-      const { duration: executionTime } = performance.measure(
-        "get-results-inner",
-        "get-results-inner-start",
-        "get-results-inner-end"
-      );
-
-      const timeToSleep = delay - executionTime;
-      if (timeToSleep > 0) {
-        if (verbose) {
-          console.info(
-            `${darkGray}info (${programName}): Sleeping for ${Number(
-              timeToSleep
-            ).toFixed(0)} milliseconds to avoid server bans.${reset}`
-          );
-        }
-        await sleepFor(timeToSleep);
-        if (verbose) {
-          console.info(
-            `${darkGray}info (${programName}): Well, back to it! Those URLs ain't going to download themselves, huha!${reset}`
-          );
-        }
-      }
-
-      if (
-        exitNow ||
-        newState.iterations === maxIterations ||
-        remainingHrefs.length === 0
-      )
-        return newState;
-
-      return getResultsInner(remainingHrefs[0], newState);
-    }
-
     performance.mark("get-results-inner-start");
     let newState: State = state;
     try {
@@ -385,12 +390,12 @@ async function getResults(rootHref: string) {
         )}`
       );
       process.exitCode = 1;
-      return await whatToDoNext(newState);
+      return await whatToDoNext(newState, getResultsInner);
     }
     console.info(
       `${green}success${reset} (${programName}): Processed successfully the url (${newState.visitedHrefs.size}/${newState.legitHrefs.size}) '${currentRootHref}'.`
     );
-    return whatToDoNext(newState);
+    return whatToDoNext(newState, getResultsInner);
   }
 
   return getResultsInner(rootHref, initialState);
