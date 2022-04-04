@@ -10,7 +10,6 @@ const version = "0.1.0";
 const programName = "scrape-characters";
 const repositoryName = "scrape-url-node";
 
-// TODO Examine if a not found error in fetch stops the script execution. Meaning after the initial root URL.
 // TODO maybe two verbose levels. The first will print the "Sleeping for" message,
 // and the second the "back to it" + is ValidHrefErrors.
 
