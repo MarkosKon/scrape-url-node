@@ -7,5 +7,5 @@ services:
     volumes:
       - ./:/home/node/app
     environment:
-      - YARN_CACHE_FOLDER=/home/node/app
+      - YARN_CACHE_FOLDER=/home/node/app/.cache/yarn
     command: tail -F anything
