@@ -1,7 +1,7 @@
 {
   "name": "@markoskon/scrape-url-node",
   "description": "A node script that scrapes linked URLs from an initial URL (under the same origin) recursively and reports in the console the unique characters it found.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "license": "MIT",
   "type": "module",
   "bin": {
