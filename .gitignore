@@ -2,3 +2,4 @@ node_modules
 dist
 eslint-print-config.json
 output
+v6

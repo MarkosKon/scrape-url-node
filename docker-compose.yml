@@ -3,7 +3,9 @@ services:
   node:
     image: node:18.4.0-bullseye
     user: node:node
-    working_dir: /app
+    working_dir: /home/node/app
     volumes:
-      - ./:/app
+      - ./:/home/node/app
+    environment:
+      - YARN_CACHE_FOLDER=/home/node/app
     command: tail -F anything
