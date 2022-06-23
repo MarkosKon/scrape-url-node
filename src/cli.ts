@@ -6,7 +6,7 @@ import { load as cheerioLoad } from "cheerio";
 
 import { darkGray, green, red, reset, yellow } from "./colors.js";
 
-const version = "0.3.0";
+const version = "0.3.1";
 const programName = "scrape";
 const repositoryName = "scrape-url-node";
 
