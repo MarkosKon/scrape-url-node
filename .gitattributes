@@ -8,8 +8,10 @@
 *.tsx text eol=lf
 *.json text eol=lf
 *.md text eol=lf
+*.yml text eol=lf
 
 .eslintignore text eol=lf
+.prettierignore text eol=lf
 .gitattributes text eol=lf
 .gitignore text eol=lf
 .editorconfig text eol=lf
