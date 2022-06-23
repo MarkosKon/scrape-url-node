@@ -2,7 +2,7 @@
 
 import fetch from "node-fetch";
 import type { Response } from "node-fetch";
-import cheerio from "cheerio";
+import { load as cheerioLoad } from "cheerio";
 
 import { darkGray, green, red, reset, yellow } from "./colors.js";
 
@@ -355,7 +355,7 @@ async function getResults(rootHref: string) {
       const body = await responseOk.text();
 
       // 2. Parse HTML string.
-      const $ = cheerio.load(body);
+      const $ = cheerioLoad(body);
 
       // 3. Get legit and failing URLs.
       const hrefs = $("a")
