@@ -1,0 +1,11 @@
+version: "3.8"
+services:
+  node:
+    image: node:16.0.0-alpine3.13
+    user: node:node
+    working_dir: /home/node/app
+    volumes:
+      - ./:/home/node/app
+    environment:
+      - YARN_CACHE_FOLDER=/home/node/app
+    command: tail -F anything

@@ -1,14 +1,13 @@
 {
-  "name": "scrape-characters-node",
-  "version": "1.0.0",
+  "name": "@markoskon/scrape-url-node",
+  "version": "0.1.0",
   "license": "MIT",
-  "private": true,
   "type": "module",
   "bin": {
-    "scrape-characters-node": "dist/src/cli.js"
+    "scrape": "dist/src/cli.js"
   },
   "engines": {
-    "node": ">=12"
+    "node": ">=16.0.0"
   },
   "files": [
     "dist/src/**/*.js"

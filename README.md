@@ -6,10 +6,18 @@ A node script that scrapes from an initial URL linked URLs, under the same origi
 - The URLs it discovered and visited. In other words, you get a list with all the linked pages under the same origin.
 - A list of URLs it discovered and not visited because they are not from the same origin. In other words, you get a list with all the URLs you link to (this list also includes URLs with hashes and non http/https, though).
 
+## Install
+
+```bash
+npm i -g @markoskon/scrape-url-node
+```
+
 ## Usage
 
-```txt
-scrape-characters-node [option..] <url>
+```bash
+scrape [option..] <url>
+# get the help menu
+scrape --help
 ```
 
 ## Future updates
